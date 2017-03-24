@@ -128,7 +128,7 @@ using std::string;
 using std::vector;
 
 
-class Flags : public virtual master::Flags
+class Flags : public virtual master::Flags //虚拟继承  防止多个基类
 {
 public:
   Flags()
@@ -213,9 +213,14 @@ int main(int argc, char** argv)
 
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-  ::Flags flags;
+  ::Flags flags;  // 当前文件中的Flags类
 
-  Try<flags::Warnings> load = flags.load("MESOS_", argc, argv);
+  // load 保存错误相关的信息
+  Try<flags::Warnings> load = flags.load("MESOS_", argc, argv); // 解析解析命令行和环境变量的参数
+
+  logging::initialize(argv[0], flags, true); // Catch signals.
+
+  LOG(INFO) << "Flags at startup: " << flags;
 
   if (flags.help) {
     cout << flags.usage() << endl;
@@ -232,6 +237,7 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;
   }
 
+  // isSame 判断是不是有内容
   if (flags.ip_discovery_command.isSome() && flags.ip.isSome()) {
     EXIT(EXIT_FAILURE) << flags.usage(
         "Only one of `--ip` or `--ip_discovery_command` should be specified");
@@ -247,8 +253,9 @@ int main(int argc, char** argv)
     os::setenv("LIBPROCESS_IP", strings::trim(ipAddress.get()));
   } else if (flags.ip.isSome()) {
     os::setenv("LIBPROCESS_IP", flags.ip.get());
+    LOG(INFO) << "ip: " << flags.ip.get();
   }
-
+  // 跟libprocess有关，LIBPROCESS_IP Sets the IP address for communication to and from libprocess.
   os::setenv("LIBPROCESS_PORT", stringify(flags.port));
 
   if (flags.advertise_ip.isSome()) {
@@ -260,6 +267,7 @@ int main(int argc, char** argv)
   }
 
   if (flags.zk.isNone()) {
+    // 异或
     if (flags.master_contender.isSome() ^ flags.master_detector.isSome()) {
       EXIT(EXIT_FAILURE)
         << flags.usage("Both --master_contender and --master_detector should "
@@ -276,8 +284,11 @@ int main(int argc, char** argv)
 
   // Log build information.
   LOG(INFO) << "Build: " << build::DATE << " by " << build::USER;
+  // I0322 17:36:19.563952 43598 main.cpp:278] Build: 2017-03-15 16:19:32 by root
+  // I0322 17:36:19.564502 43598 main.cpp:279] Version: 1.2.0
   LOG(INFO) << "Version: " << MESOS_VERSION;
 
+ // 不是git的所以没有git 信息
   if (build::GIT_TAG.isSome()) {
     LOG(INFO) << "Git tag: " << build::GIT_TAG.get();
   }
@@ -289,8 +300,11 @@ int main(int argc, char** argv)
   // This should be the first invocation of `process::initialize`. If it returns
   // `false`, then it has already been called, which means that the
   // authentication realm for libprocess-level HTTP endpoints was not set to the
-  // correct value for the master.
-  if (!process::initialize(
+  // correct value for the master.       
+  
+  // READWRITE_HTTP_AUTHENTICATION_REALM "mesos-master-readwrite"
+  if (!process::initialize( // 初始化一个名为master的进程, 第一次执行  应该是启动libprocess的意思  启动会用到前面的
+  // LIBPROCESS_环境变量 
           "master",
           READWRITE_HTTP_AUTHENTICATION_REALM,
           READONLY_HTTP_AUTHENTICATION_REALM)) {
@@ -298,7 +312,7 @@ int main(int argc, char** argv)
                        << "`main()` was not the function's first invocation";
   }
 
-  logging::initialize(argv[0], flags, true); // Catch signals.
+
 
   // Log any flag warnings (after logging is initialized).
   foreach (const flags::Warning& warning, load->warnings) {
@@ -307,7 +321,8 @@ int main(int argc, char** argv)
 
   spawn(new VersionProcess(), true);
 
-  // Initialize firewall rules.
+  // Initialize firewall rules. 以json格式 通过文件路径传入
+  // 这个参数的主要作用为，并不是Mesos的每一个API都想暴露出来，disabled_endpoints里面就是不能访问的API。
   if (flags.firewall_rules.isSome()) {
     vector<Owned<FirewallRule>> rules;
 
@@ -327,20 +342,21 @@ int main(int argc, char** argv)
   }
 
   // Initialize modules.
+  // 会将路径中的so文件load进来，包括allocator、hook、Isolator
   if (flags.modules.isSome() && flags.modulesDir.isSome()) {
     EXIT(EXIT_FAILURE) <<
       flags.usage("Only one of --modules or --modules_dir should be specified");
   }
 
   if (flags.modulesDir.isSome()) {
-    Try<Nothing> result = ModuleManager::load(flags.modulesDir.get());
+    Try<Nothing> result = ModuleManager::load(flags.modulesDir.get()); // ModuleManager::load 在src/module、manager.cpp
     if (result.isError()) {
       EXIT(EXIT_FAILURE) << "Error loading modules: " << result.error();
     }
   }
 
   if (flags.modules.isSome()) {
-    Try<Nothing> result = ModuleManager::load(flags.modules.get());
+    Try<Nothing> result = ModuleManager::load(flags.modules.get()); 
     if (result.isError()) {
       EXIT(EXIT_FAILURE) << "Error loading modules: " << result.error();
     }
@@ -364,6 +380,7 @@ int main(int argc, char** argv)
   }
 
   // Initialize hooks.
+  // 初始化hook  将hook name与module关联
   if (flags.hooks.isSome()) {
     Try<Nothing> result = HookManager::initialize(flags.hooks.get());
     if (result.isError()) {
@@ -372,6 +389,10 @@ int main(int argc, char** argv)
   }
 
   // Create an instance of allocator.
+  // allocator 的头文件在include/mesos/allocator/allocator.hpp
+  // Allocator::create实现在src/master/allocator/allocator.cpp
+  // Mesos源码中默认的Allocator，即HierarchicalDRFAllocator的位置在$MESOS_HOME/src/master/allocator/mesos/hierarchical.hpp，
+  // 而DRF中对每个Framework排序的Sorter位于$MESOS_HOME/src/master/allocator/sorter/drf/sorter.cpp，可以查看其源码了解它的工作原理
   const string allocatorName = flags.allocator;
   Try<Allocator*> allocator = Allocator::create(allocatorName);
 
@@ -456,7 +477,11 @@ int main(int argc, char** argv)
 
   MasterContender* contender;
   MasterDetector* detector;
-
+  
+  // contender 竞争者
+  // 如果 flags.master_contender 有值 就用指定的module的
+  // 如果 flags.zk为空 就用StandaloneMasterContender()
+  // 如果 flags.zk不为空 就用ZooKeeperMasterContender（）
   Try<MasterContender*> contender_ = MasterContender::create(
       flags.zk, flags.master_contender);
 
@@ -467,6 +492,7 @@ int main(int argc, char** argv)
 
   contender = contender_.get();
 
+  // 与contentor 类似 也有三个
   Try<MasterDetector*> detector_ = MasterDetector::create(
       flags.zk, flags.master_detector);
 
@@ -479,6 +505,7 @@ int main(int argc, char** argv)
 
   Option<Authorizer*> authorizer_ = None();
 
+  // 只支持一个authorizers
   auto authorizerNames = strings::split(flags.authorizers, ",");
   if (authorizerNames.empty()) {
     EXIT(EXIT_FAILURE) << "No authorizer specified";
@@ -492,6 +519,7 @@ int main(int argc, char** argv)
   // a non default authorizer is requested, it will be used and
   // the contents of --acls will be ignored.
   // TODO(arojas): Consider adding support for multiple authorizers.
+  // acl 在authorizerName是默认的情况下使用
   Result<Authorizer*> authorizer((None()));
   if (authorizerName != master::DEFAULT_AUTHORIZER) {
     LOG(INFO) << "Creating '" << authorizerName << "' authorizer";
@@ -517,12 +545,15 @@ int main(int argc, char** argv)
     // creates a copy of the authorizer during construction. Thus, if in the
     // future it becomes possible to dynamically set the authorizer, this would
     // break.
+    // 设置授权回调  用于授权检查
     process::http::authorization::setCallbacks(
         createAuthorizationCallbacks(authorizer_.get()));
   }
 
   Files files(READONLY_HTTP_AUTHENTICATION_REALM, authorizer_);
 
+  // agent_removal_rate_limit 格式是(Number of agents)/(Duration)
+  // 默认情况下，一旦健康检查失败，master就会remove的agent
   Option<shared_ptr<RateLimiter>> slaveRemovalLimiter = None();
   if (flags.agent_removal_rate_limit.isSome()) {
     // Parse the flag value.
@@ -561,22 +592,23 @@ int main(int argc, char** argv)
 
   Master* master =
     new Master(
-      allocator.get(),
-      registrar,
-      &files,
-      contender,
-      detector,
-      authorizer_,
-      slaveRemovalLimiter,
-      flags);
+      allocator.get(),  // 资源分配器
+      registrar,        // 目前不清楚 具体干嘛的    
+      &files,           // 目前不清楚 具体干嘛的
+      contender,        // 竞争器，来着决定哪个master leader
+      detector,         // 探测器，来着决定哪个master leader
+      authorizer_,      // 授权检查器
+      slaveRemovalLimiter,  // 健康检查器
+      flags);           // 命令行参数
 
+  // 表示在使用StandaloneMasterDetector时，需要告诉StandaloneMasterDetector 当前的 master时leader
   if (flags.zk.isNone() && flags.master_detector.isNone()) {
     // It means we are using the standalone detector so we need to
     // appoint this Master as the leader.
     dynamic_cast<StandaloneMasterDetector*>(detector)->appoint(master->info());
   }
 
-  process::spawn(master);
+  process::spawn(master); // 启动master，实际上是一个socket server
   process::wait(master->self());
 
   delete master;

@@ -1414,7 +1414,7 @@ Future<Nothing> HierarchicalAllocatorProcess::allocate(
   allocationCandidates |= slaveIds;
 
   if (allocation.isNone() || !allocation->isPending()) {
-    allocation = dispatch(self(), &Self::_allocate);
+    allocation = dispatch(self(), &Self::_allocate); // Self::_allocate这里非配
   }
 
   return allocation.get();

@@ -99,7 +99,7 @@ public:
             "module is of kind '" + module->kind + "', but the requested "
             "kind is '" + expectedKind + "'");
       }
-
+      //  获取module的实例
       T* instance =
         module->create(
             params.isSome() ? params.get() : moduleParameters[moduleName]);

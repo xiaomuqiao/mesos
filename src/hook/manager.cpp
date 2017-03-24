@@ -67,6 +67,7 @@ Try<Nothing> HookManager::initialize(const string& hookList)
       }
 
       // Let's create an instance of the hook module.
+      // ModuleManager::create 在src/moduele/manager.hpp
       Try<Hook*> module = ModuleManager::create<Hook>(hook);
       if (module.isError()) {
         return Error(

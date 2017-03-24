@@ -3058,6 +3058,7 @@ UPID ProcessManager::spawn(ProcessBase* process, bool manage)
   UPID pid = process->self();
 
   // Add process to the run queue (so 'initialize' will get invoked).
+  // process的initialize会被调用
   enqueue(process);
 
   VLOG(2) << "Spawned process " << pid;

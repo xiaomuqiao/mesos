@@ -6684,7 +6684,7 @@ Executor* Framework::launchExecutor(
     // executor info works as a placeholder.
     // TODO(nnielsen): Obsolete the requirement for executors to run
     // one-off tasks.
-    launch = slave->containerizer->launch(
+    launch = slave->containerizer->launch(  // containerizer  是slave启动时设置的
         containerId,
         taskInfo,
         executorInfo_,

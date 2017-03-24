@@ -493,7 +493,7 @@ int main(int argc, char** argv)
   Fetcher* fetcher = new Fetcher();
 
   Try<Containerizer*> containerizer =
-    Containerizer::create(flags, false, fetcher);
+    Containerizer::create(flags, false, fetcher); //src/slave/containerizer/containerizer.cpp
 
   if (containerizer.isError()) {
     EXIT(EXIT_FAILURE)

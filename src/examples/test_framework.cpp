@@ -209,6 +209,7 @@ public:
 int main(int argc, char** argv)
 {
   // Find this executable's directory to locate executor.
+  // 指定executor的uri或者地址  ./build/src/test-executor
   string uri;
   Option<string> value = os::getenv("MESOS_HELPER_DIR");
   if (value.isSome()) {
@@ -264,6 +265,8 @@ int main(int argc, char** argv)
     implicitAcknowledgements = false;
   }
 
+  // MesosSchedulerDriver是写Framework的SDK类似的东西，使得写一个Framework非常简单
+  //和Mesos-Master的通信等细节，都封装在MesosSchedulerDriver里面
   MesosSchedulerDriver* driver;
   TestScheduler scheduler(implicitAcknowledgements, executor, flags.role);
 

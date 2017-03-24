@@ -40,7 +40,7 @@ Try<Allocator*> Allocator::create(const string& name)
   if (name == mesos::internal::master::DEFAULT_ALLOCATOR) {
     return HierarchicalDRFAllocator::create();
   }
-
+ // ModuleManager::create 在src/moduele/manager.hpp
   return modules::ModuleManager::create<Allocator>(name);
 }
 

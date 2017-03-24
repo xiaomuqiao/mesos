@@ -1795,6 +1795,7 @@ void MesosSchedulerDriver::initialize() {
 //     state of the driver and is used to enforce its state transitions.
 // TODO(vinod): Deprecate this in favor of the constructor that takes
 // the credential.
+// 头文件在include/mesos/sheduler.hpp
 MesosSchedulerDriver::MesosSchedulerDriver(
     Scheduler* _scheduler,
     const FrameworkInfo& _framework,
@@ -2008,7 +2009,7 @@ Status MesosSchedulerDriver::start()
           latch);
     }
 
-    spawn(process);
+    spawn(process); //这里的spawn就是使用process的spawn spawn不是一个类成员函数  是一个域名下的函数
 
     return status = DRIVER_RUNNING;
   }
